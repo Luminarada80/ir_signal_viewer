@@ -21,7 +21,7 @@ for i, row in df.iterrows():
 source = ColumnDataSource(data=dict(
     time=time,
     signal=signal,
-    label=["MARK" if s == 1 else "SPACE" for s in signal]
+    label=["1" if s == 1 else "0" for s in signal]
 ))
 
 # Create interactive plot
