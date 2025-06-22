@@ -2,63 +2,51 @@ import pandas as pd
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, HoverTool, WheelZoomTool, Range1d
 from bokeh.io import output_notebook
-
+output_notebook()
 # Load CSV data
 df = pd.read_csv("pulses.csv")
-df["Signal"] = df["Type"].map({"MARK": 1, "SPACE": 0})
+from bokeh.models import HoverTool
 
-# Build step plot data
-time = []
-signal = []
+# Prepare quad coordinates for each pulse segment
+data = dict(
+    left=df["Start"],
+    right=df["End"],
+    top=[1.1 if t == "MARK" else 0.1 for t in df["Type"]],
+    bottom=[0.9 if t == "MARK" else -0.1 for t in df["Type"]],
+    duration=df["Duration"],
+    type=df["Type"]
+)
 
-for i, row in df.iterrows():
-    time.append(row["Start"])
-    signal.append(row["Signal"])
-    time.append(row["End"])
-    signal.append(row["Signal"])
+source = ColumnDataSource(data)
 
-# Build Bokeh data source
-source = ColumnDataSource(data=dict(
-    time=time,
-    signal=signal,
-    label=["1" if s == 1 else "0" for s in signal]
-))
-
-# Create interactive plot
 p = figure(
-    width=1000,
-    height=300,
-    title="IR Signal Viewer",
-    tools="pan,box_zoom,reset",
-    active_scroll=None,  # disable default scroll behavior
-    x_axis_label="Time (µs)",
-    y_axis_label="Signal",
-    y_range=Range1d(-0.5, 1.5, bounds=(-0.5, 1.5)),  # fixed y-range
+    title="IR Signal", width=600, height=300,
+    x_axis_label="Time (µs)", y_axis_label="Signal Received",
+    y_range=Range1d(-0.5, 1.5, bounds=(-0.5, 1.5)),
+    tools="reset, pan, wheel_zoom"
+)
+p.add_tools(WheelZoomTool(dimensions="width"))
+
+# Add visible rectangular pulses
+quad_renderer = p.quad(
+    left="left", right="right", 
+    top="top", bottom="bottom",
+    source=source, 
+    fill_color="navy", fill_alpha=0.4, line_color="black"
 )
 
-# Fix the y-axis range to disable vertical zooming
-p.y_range.start = -0.5
-p.y_range.end = 1.5
-
-# Add horizontal-only zoom tool
-wheel_zoom_x = WheelZoomTool(dimensions='width')
-p.add_tools(wheel_zoom_x)
-p.toolbar.active_scroll = wheel_zoom_x
-
-# Step-like plot
-p.step(x='time', y='signal', line_width=2, mode='after', source=source, legend_label="IR Signal")
-
-# Add hover tool
+# Add hover tool for the full pulse spans
 hover = HoverTool(
+    renderers=[quad_renderer],
     tooltips=[
-        ("Time", "@time"),
-        ("Signal", "@label"),
+        ("Type", "@type"),
+        ("Start", "@left"),
+        ("End", "@right"),
+        ("Duration", "@duration µs")
     ],
-    mode="vline"
+    mode='mouse'
 )
+
 p.add_tools(hover)
 
-# Display
-output_notebook()  # or 
-output_file("ir_viewer.html")
 show(p)
